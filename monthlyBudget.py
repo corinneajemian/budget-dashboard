@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import datetime
 
-
 def show_monthly_person(name, accounts, incoming, transactions, budget_df = None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 

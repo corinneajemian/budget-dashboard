@@ -20,16 +20,16 @@ num_people = st.radio(
     horizontal=True
 )
 
-person1_name = st.text_input("Person 1 Name", value="Person 1")
+person1_name = st.text_input("Person 1 Name", value="Corinne")
 
 if num_people == 2:
-    person2_name = st.text_input("Person 2 Name", value="Person 2")
+    person2_name = st.text_input("Person 2 Name", value="John")
 else:
     person2_name = None
 
 data_source = st.text_input(
     "Excel file name",
-    value="BudgetFinances_template.xlsx",
+    value="BudgetFinances.xlsx",
     help="Enter the Excel file name exactly as it appears in this folder."
 )
 
