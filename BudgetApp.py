@@ -12,11 +12,11 @@ st.set_page_config(page_title="Budget App", layout="wide")
 st.title("💸 Budget App")
 
 # ---- Load Excel ----
+budget = pd.read_excel("BudgetFinances.xlsx", sheet_name="MonthlyBudget")
 accounts = pd.read_excel("BudgetFinances.xlsx", sheet_name="BudgetFinances")
 incoming = pd.read_excel("BudgetFinances.xlsx", sheet_name="Incoming")
-transactionsCorinne = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingCorinne")
+transactionsCorinne = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingName")
 transactionsJoint = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingJoint")
-transactionsJohn = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingJohn")
 wishlist = pd.read_excel("BudgetFinances.xlsx", sheet_name="Wishlist")
 
 wishlist["Cost"] = pd.to_numeric(wishlist["Cost"], errors="coerce")
@@ -40,10 +40,10 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 with tab1:
-    show_monthly_person("Corinne", accounts, transactionsCorinne, monthly_budget=1380)
+    show_monthly_person("Name", accounts, transactionsCorinne, budget) # Adjust Name as needed
 
-with tab2:
-    show_monthly_person("John", accounts, transactionsJohn, monthly_budget=1380)
+#with tab2:
+#    show_monthly_person("Name", accounts, transactionsJohn, budget)
 # =========================
 # 📅 Monthly Budget Joint
 # =========================
