@@ -87,7 +87,7 @@ def show_monthly_person(name, accounts, transactions, monthly_budget=1380):
         value = spend_room
 
     elif spend_room > -200:
-        label = "⚠️ Let to Spend - Around breakeven"
+        label = "⚠️ Left to Spend - Around breakeven"
         value = abs(spend_room)
 
     else:
