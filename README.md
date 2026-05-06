@@ -44,6 +44,19 @@ Recommended Extensions:
 - Pylance
 
 ---
+# ⬇️ Clone the Repository
+
+Open a terminal and run:
+
+```bash
+git clone https://github.com/corinneajemian/budget-dashboard.git
+```
+
+Then move into the project folder:
+
+```bash
+cd budget-dashboard
+```
 
 # 📦 Install Dependencies
 
