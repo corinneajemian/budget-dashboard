@@ -1,16 +1,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from paychecks import get_paychecks
 
 # =========================
 # 📅 Incoming TAB
 # =========================
 
-def show_incoming_tab(accounts, incoming):
+def show_incoming_tab(accounts, incoming, paychecks = None):
    
     st.subheader("Incoming Transactions")
-    paychecks = get_paychecks()
 
     # Add hardcoded paychecks into incoming data
     incoming = pd.concat([incoming, paychecks], ignore_index=True)

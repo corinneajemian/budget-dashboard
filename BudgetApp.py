@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import datetime
-from paychecks import get_paychecks
+from paychecks import show_paycheck_editor
 from monthlyBudget import show_monthly_person
 from incoming import show_incoming_tab
 
@@ -10,15 +10,55 @@ from incoming import show_incoming_tab
 st.set_page_config(page_title="Budget App", layout="wide")
 
 st.title("💸 Budget App")
-data_source = "BudgetFinances_template.xlsx"
+# =========================
+# 👤 User Setup
+# =========================
 
+num_people = st.radio(
+    "How many people are using this budget sheet?",
+    [1, 2],
+    horizontal=True
+)
+
+person1_name = st.text_input("Person 1 Name", value="Person 1")
+
+if num_people == 2:
+    person2_name = st.text_input("Person 2 Name", value="Person 2")
+else:
+    person2_name = None
+
+data_source = st.text_input(
+    "Excel file name",
+    value="BudgetFinances_template.xlsx",
+    help="Enter the Excel file name exactly as it appears in this folder."
+)
+
+person1_sheet = "Spending" + person1_name
+
+person2_sheet = "Spending" + person2_name
+
+paychecks = show_paycheck_editor(person1_name, person2_name)
 # ---- Load Excel ----
-budget = pd.read_excel(data_source, sheet_name="MonthlyBudget")
-accounts = pd.read_excel(data_source, sheet_name="BudgetFinances")
-incoming = pd.read_excel(data_source, sheet_name="Incoming")
-transactions = pd.read_excel(data_source, sheet_name="SpendingName")
-transactionsJoint = pd.read_excel(data_source, sheet_name="SpendingJoint")
-wishlist = pd.read_excel(data_source, sheet_name="Wishlist")
+try:
+    budget = pd.read_excel(data_source, sheet_name="MonthlyBudget")
+    accounts = pd.read_excel(data_source, sheet_name="BudgetFinances")
+    incoming = pd.read_excel(data_source, sheet_name="Incoming")
+
+    transactions1 = pd.read_excel(data_source, sheet_name=person1_sheet)
+
+    if num_people == 2:
+        transactions2 = pd.read_excel(data_source, sheet_name=person2_sheet)
+
+    transactionsJoint = pd.read_excel(data_source, sheet_name="SpendingJoint")
+    wishlist = pd.read_excel(data_source, sheet_name="Wishlist")
+
+except FileNotFoundError:
+    st.error(f"Could not find `{data_source}`.")
+    st.stop()
+
+except ValueError as e:
+    st.error(f"Excel sheet error: {e}")
+    st.stop()
 
 wishlist["Cost"] = pd.to_numeric(wishlist["Cost"], errors="coerce")
 
@@ -30,9 +70,14 @@ accounts["Last Statement balance"] = pd.to_numeric(accounts["Last Statement bala
 incoming["Due Date"] = pd.to_datetime(incoming["Due Date"], errors="coerce")
 incoming["Total"] = pd.to_numeric(incoming["Total"], errors="coerce")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "🥧 Your Monthly Budget",
-    "🥧 Your 2nd Monthly Budget",
+tab_names = [
+    f"🥧 {person1_name}'s Monthly Budget"
+]
+
+if num_people == 2:
+    tab_names.append(f"🥧 {person2_name}'s Monthly Budget")
+
+tab_names.extend([
     "🥧 Joint Monthly Budget",
     "💳 Accounts",
     "📅 Incoming",
@@ -40,11 +85,29 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "✨ Wishlist"
 ])
 
-with tab1:
-    show_monthly_person("Name", accounts, transactions, budget) # Adjust Name as needed
+tabs = st.tabs(tab_names)
+tab1 = tabs[0]
 
-with tab2:
-    show_monthly_person("John", accounts, transactions, budget)
+if num_people == 2:
+    tab2 = tabs[1]
+    tab3 = tabs[2]
+    tab4 = tabs[3]
+    tab5 = tabs[4]
+    tab6 = tabs[5]
+    tab7 = tabs[6]
+else:
+    tab3 = tabs[1]
+    tab4 = tabs[2]
+    tab5 = tabs[3]
+    tab6 = tabs[4]
+    tab7 = tabs[5]
+
+with tab1:
+    show_monthly_person(person1_name, accounts, transactions1, budget, paychecks)
+
+if num_people == 2:
+    with tab2:
+        show_monthly_person(person2_name, accounts, transactions2, budget, paychecks)
 # =========================
 # 📅 Monthly Budget Joint
 # =========================
@@ -181,7 +244,7 @@ with tab4:
     st.plotly_chart(fig, use_container_width=True)
 
 with tab5:
-    show_incoming_tab(accounts, incoming)
+    show_incoming_tab(accounts, incoming, paychecks)
 # =========================
 # 💳 ACCOUNTS TAB
 # =========================

@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import datetime
-from paychecks import get_paychecks
 
 
-def show_monthly_person(name, accounts, transactions, budget_df = None):
+def show_monthly_person(name, accounts, transactions, budget_df = None, paychecks=None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 
     monthly_budget = 1380
@@ -71,7 +70,6 @@ def show_monthly_person(name, accounts, transactions, budget_df = None):
     person_accounts = accounts[accounts["Owner"] == name]
     amount_owed = person_accounts["Total"].sum()
 
-    paychecks = get_paychecks()
     paychecks["Total"] = pd.to_numeric(paychecks["Total"], errors="coerce")
     paychecks["Due Date"] = pd.to_datetime(paychecks["Due Date"], errors="coerce")
 

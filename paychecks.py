@@ -1,35 +1,45 @@
+import streamlit as st
 import pandas as pd
 
-def get_paychecks():
-    data = [
-        {
-            "Provider": "Chase",
-            "Type": "Checking",
-            "Account": "1234",
-            "Transaction": "Company Paycheck",
-            "Total": 1000,
-            "Owner": "Me",
-            "Due Date": "7-May",
-        },
-        # Add more enteries of your incoming paychecks...
-        #{
-        #    "Provider": "Add Banking Company",
-        #    "Type": "Checking or Savings",
-        #    "Account": "Last 4 digits",
-        #    "Transaction": "Company of Paycheck",
-        #    "Total": 1000,
-        #    "Owner": "Your Name",
-        #    "Due Date": "Date Received",
-        #},
+def show_paycheck_editor(person1_name, person2_name=None):
+    st.subheader("💰 Paycheck Setup")
 
-        
+    default_rows = [
+        {
+            "Provider": "",
+            "Type": "Personal Checking",
+            "Account": "",
+            "Transaction": "Paycheck",
+            "Total": 0.00,
+            "Owner": person1_name,
+            "Due Date": pd.Timestamp.today().date(),
+        }
     ]
 
-    df = pd.DataFrame(data)
+    if person2_name is not None:
+        default_rows.append(
+            {
+                "Provider": "",
+                "Type": "Personal Checking",
+                "Account": "",
+                "Transaction": "Paycheck",
+                "Total": 0.00,
+                "Owner": person2_name,
+                "Due Date": pd.Timestamp.today().date(),
+            }
+        )
 
-    # Clean it here once so you never worry again
-    df["Total"] = pd.to_numeric(df["Total"], errors="coerce")
-    df["Due Date"] = pd.to_datetime(df["Due Date"] + "-2026", format="%d-%b-%Y", errors="coerce")
-    df["Account"] = df["Account"].astype(str)
+    default_paychecks = pd.DataFrame(default_rows)
 
-    return df
+    paychecks = st.data_editor(
+        default_paychecks,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="paycheck_editor"
+    )
+
+    paychecks["Total"] = pd.to_numeric(paychecks["Total"], errors="coerce")
+    paychecks["Due Date"] = pd.to_datetime(paychecks["Due Date"], errors="coerce")
+    paychecks["Account"] = paychecks["Account"].astype(str)
+
+    return paychecks
