@@ -10,14 +10,15 @@ from incoming import show_incoming_tab
 st.set_page_config(page_title="Budget App", layout="wide")
 
 st.title("💸 Budget App")
+data_source = "BudgetFinances_template.xlsx"
 
 # ---- Load Excel ----
-budget = pd.read_excel("BudgetFinances.xlsx", sheet_name="MonthlyBudget")
-accounts = pd.read_excel("BudgetFinances.xlsx", sheet_name="BudgetFinances")
-incoming = pd.read_excel("BudgetFinances.xlsx", sheet_name="Incoming")
-transactionsCorinne = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingName")
-transactionsJoint = pd.read_excel("BudgetFinances.xlsx", sheet_name="SpendingJoint")
-wishlist = pd.read_excel("BudgetFinances.xlsx", sheet_name="Wishlist")
+budget = pd.read_excel(data_source, sheet_name="MonthlyBudget")
+accounts = pd.read_excel(data_source, sheet_name="BudgetFinances")
+incoming = pd.read_excel(data_source, sheet_name="Incoming")
+transactions = pd.read_excel(data_source, sheet_name="SpendingName")
+transactionsJoint = pd.read_excel(data_source, sheet_name="SpendingJoint")
+wishlist = pd.read_excel(data_source, sheet_name="Wishlist")
 
 wishlist["Cost"] = pd.to_numeric(wishlist["Cost"], errors="coerce")
 
@@ -30,8 +31,8 @@ incoming["Due Date"] = pd.to_datetime(incoming["Due Date"], errors="coerce")
 incoming["Total"] = pd.to_numeric(incoming["Total"], errors="coerce")
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "🥧 Corinne's Monthly Budget",
-    "🥧 John's Monthly Budget",
+    "🥧 Your Monthly Budget",
+    "🥧 Your 2nd Monthly Budget",
     "🥧 Joint Monthly Budget",
     "💳 Accounts",
     "📅 Incoming",
@@ -40,10 +41,10 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 with tab1:
-    show_monthly_person("Name", accounts, transactionsCorinne, budget) # Adjust Name as needed
+    show_monthly_person("Name", accounts, transactions, budget) # Adjust Name as needed
 
-#with tab2:
-#    show_monthly_person("Name", accounts, transactionsJohn, budget)
+with tab2:
+    show_monthly_person("John", accounts, transactions, budget)
 # =========================
 # 📅 Monthly Budget Joint
 # =========================
@@ -68,7 +69,7 @@ with tab3:
         tx_filtered = transactionsJoint
 
     # --- Budget Setup ---
-    monthly_budget = 2800
+    monthly_budget = 1000
 
     total_spent = tx_filtered["Total"].sum()
 
@@ -144,11 +145,6 @@ with tab3:
     )
     st.metric("Total Spent", f"${tx_filtered['Total'].sum():,.2f}")
 
-with tab5:
-    show_incoming_tab(accounts, incoming)
-# =========================
-# 💳 ACCOUNTS TAB
-# =========================
 with tab4:
     st.subheader("Accounts")
 
@@ -183,161 +179,13 @@ with tab4:
     fig.update_layout(xaxis_tickangle=-30)
 
     st.plotly_chart(fig, use_container_width=True)
+
+with tab5:
+    show_incoming_tab(accounts, incoming)
 # =========================
-# 🏡 Household Health Dashboard
+# 💳 ACCOUNTS TAB
 # =========================
-with tab6:
-    st.subheader("🏡 Household Health Dashboard")
 
-    # ---- Budgets ----
-    corinne_budget = 1380
-    john_budget = 1380
-    joint_budget = 2800
-    total_budget = corinne_budget + john_budget + joint_budget
-
-    # ---- Clean spending data ----
-    transactionsCorinne["Date"] = pd.to_datetime(transactionsCorinne["Date"], errors="coerce")
-    transactionsCorinne["Total"] = pd.to_numeric(transactionsCorinne["Total"], errors="coerce")
-
-    transactionsJohn["Date"] = pd.to_datetime(transactionsJohn["Date"], errors="coerce")
-    transactionsJohn["Total"] = pd.to_numeric(transactionsJohn["Total"], errors="coerce")
-
-    transactionsJoint["Date"] = pd.to_datetime(transactionsJoint["Date"], errors="coerce")
-    transactionsJoint["Total"] = pd.to_numeric(transactionsJoint["Total"], errors="coerce")
-
-    # ---- Month filter ----
-    all_months = sorted(
-        set(transactionsCorinne["Date"].dt.to_period("M").astype(str).dropna()) |
-        set(transactionsJohn["Date"].dt.to_period("M").astype(str).dropna()) |
-        set(transactionsJoint["Date"].dt.to_period("M").astype(str).dropna())
-    )
-
-    selected_month = st.selectbox(
-        "Filter by month",
-        ["All"] + all_months,
-        key="household_month_filter"
-    )
-
-    def filter_by_month(df, selected_month):
-        df = df.copy()
-        df["Month"] = df["Date"].dt.to_period("M").astype(str)
-
-        if selected_month != "All":
-            return df[df["Month"] == selected_month]
-
-        return df
-
-    corinne_filtered = filter_by_month(transactionsCorinne, selected_month)
-    john_filtered = filter_by_month(transactionsJohn, selected_month)
-    joint_filtered = filter_by_month(transactionsJoint, selected_month)
-
-    # ---- Totals ----
-    corinne_spent = corinne_filtered["Total"].sum()
-    john_spent = john_filtered["Total"].sum()
-    joint_spent = joint_filtered["Total"].sum()
-
-    total_spent = corinne_spent + john_spent + joint_spent
-    remaining_budget = total_budget - total_spent
-
-    # ---- Days left ----
-    today = datetime.date.today()
-
-    if today.month == 12:
-        next_month = datetime.date(today.year + 1, 1, 1)
-    else:
-        next_month = datetime.date(today.year, today.month + 1, 1)
-
-    end_of_month = next_month - datetime.timedelta(days=1)
-    days_left = max((end_of_month - today).days, 0)
-    days_elapsed = today.day
-
-    burn_rate = (total_spent-1000) / max(days_elapsed, 1)
-    projected_month_end_spend = burn_rate * end_of_month.day
-    projected_savings = total_budget - projected_month_end_spend
-
-    daily_budget_remaining = remaining_budget / max(days_left, 1)
-
-    # ---- Incoming paychecks ----
-    paychecks = get_paychecks()
-
-    paychecks["Due Date"] = pd.to_datetime(paychecks["Due Date"], errors="coerce")
-    paychecks["Total"] = pd.to_numeric(paychecks["Total"], errors="coerce")
-
-    future_paychecks = paychecks[paychecks["Due Date"] >= pd.Timestamp.today()]
-    future_income = future_paychecks["Total"].sum()
-
-    # ---- Debt ----
-    total_debt = accounts["Total"].sum()
-
-    projected_after_income = future_income - total_debt
-
-    # ---- Top Metrics ----
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("💸 Spent This Month", f"${total_spent:,.2f}")
-    col2.metric("🎯 Monthly Budget", f"${total_budget:,.2f}")
-    col3.metric("💰 Budget Remaining", f"${remaining_budget:,.2f}")
-    col4.metric("📅 Days Left", f"{days_left} days")
-
-    # ---- Burn / Savings Row ----
-    col5, col6, col7, col8 = st.columns(4)
-
-    col5.metric("🔥 Daily Burn Rate", f"${burn_rate:,.2f}/day")
-    col6.metric("📊 Projected Month-End Spend", f"${projected_month_end_spend:,.2f}")
-    col7.metric("✅ Projected Savings", f"${projected_savings:,.2f}")
-    col8.metric("🧮 Daily Budget Left", f"${daily_budget_remaining:,.2f}/day")
-
-    # ---- Household status ----
-    st.markdown("### 🧠 Are we saving money this month?")
-
-    if projected_savings > 0:
-        st.success(f"Yes — at the current pace, you are projected to save about ${projected_savings:,.2f} this month.")
-    elif projected_savings < 0:
-        st.error(f"Not quite — at the current pace, you are projected to overspend by about ${abs(projected_savings):,.2f}.")
-    else:
-        st.info("You are projected to break even exactly this month.")
-
-    # ---- Spending comparison chart ----
-    spending_by_bucket = pd.DataFrame([
-        {"Bucket": "Corinne", "Spent": corinne_spent, "Budget": corinne_budget},
-        {"Bucket": "John", "Spent": john_spent, "Budget": john_budget},
-        {"Bucket": "Joint", "Spent": joint_spent, "Budget": joint_budget},
-    ])
-
-    st.markdown("### 📊 Spending vs Budget")
-
-    fig_health = px.bar(
-        spending_by_bucket,
-        x="Bucket",
-        y=["Spent", "Budget"],
-        barmode="group",
-        title="Spending vs Budget by Bucket"
-    )
-
-    st.plotly_chart(fig_health, use_container_width=True)
-
-    # ---- Combined transaction table ----
-    st.markdown("### 🧾 Combined Transactions")
-
-    corinne_table = corinne_filtered.copy()
-    corinne_table["Budget Bucket"] = "Corinne"
-
-    john_table = john_filtered.copy()
-    john_table["Budget Bucket"] = "John"
-
-    joint_table = joint_filtered.copy()
-    joint_table["Budget Bucket"] = "Joint"
-
-    combined_transactions = pd.concat(
-        [corinne_table, john_table, joint_table],
-        ignore_index=True
-    )
-
-    st.dataframe(
-        combined_transactions.sort_values("Date", ascending=False),
-        use_container_width=True,
-        hide_index=True
-    )
 # =========================
 # ✨ Wishlist
 # =========================

@@ -5,9 +5,23 @@ import datetime
 from paychecks import get_paychecks
 
 
-def show_monthly_person(name, accounts, transactions, monthly_budget=1380):
+def show_monthly_person(name, accounts, transactions, budget_df = None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 
+    monthly_budget = 1380
+
+    # If budget sheet was provided, override it
+    if budget_df is not None:
+        budget_df.columns = budget_df.columns.str.strip()
+        budget_df["Owner"] = budget_df["Owner"].astype(str).str.strip()
+
+        matching_budget = budget_df.loc[
+            budget_df["Owner"] == name,
+            "Budget"
+        ]
+
+    if not matching_budget.empty:
+        monthly_budget = matching_budget.iloc[0]
     transactions = transactions.copy()
     transactions["Date"] = pd.to_datetime(transactions["Date"], errors="coerce")
     transactions["Total"] = pd.to_numeric(transactions["Total"], errors="coerce")
@@ -119,7 +133,11 @@ def show_monthly_person(name, accounts, transactions, monthly_budget=1380):
             texttemplate="%{label}<br>%{percent}<br>$%{value:,.2f}"
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            key=f"{name.lower()}_spending_pie_chart"
+        )
     else:
         st.info("No data available for selected month")
 
