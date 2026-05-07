@@ -6,12 +6,9 @@ import plotly.express as px
 # 📅 Incoming TAB
 # =========================
 
-def show_incoming_tab(accounts, incoming, paychecks = None):
+def show_incoming_tab(accounts, incoming):
    
     st.subheader("Incoming Transactions")
-
-    # Add hardcoded paychecks into incoming data
-    incoming = pd.concat([incoming, paychecks], ignore_index=True)
 
     # Clean incoming columns
     incoming["Due Date"] = pd.to_datetime(incoming["Due Date"], errors="coerce")

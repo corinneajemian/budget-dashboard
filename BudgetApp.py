@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import datetime
-from paychecks import show_paycheck_editor
 from monthlyBudget import show_monthly_person
 from incoming import show_incoming_tab
 
@@ -37,7 +36,6 @@ person1_sheet = "Spending" + person1_name
 
 person2_sheet = "Spending" + person2_name
 
-paychecks = show_paycheck_editor(person1_name, person2_name)
 # ---- Load Excel ----
 try:
     budget = pd.read_excel(data_source, sheet_name="MonthlyBudget")
@@ -103,11 +101,11 @@ else:
     tab7 = tabs[5]
 
 with tab1:
-    show_monthly_person(person1_name, accounts, transactions1, budget, paychecks)
+    show_monthly_person(person1_name, accounts, incoming, transactions1, budget)
 
 if num_people == 2:
     with tab2:
-        show_monthly_person(person2_name, accounts, transactions2, budget, paychecks)
+        show_monthly_person(person2_name, accounts, incoming, transactions2, budget)
 # =========================
 # 📅 Monthly Budget Joint
 # =========================
@@ -244,7 +242,7 @@ with tab4:
     st.plotly_chart(fig, use_container_width=True)
 
 with tab5:
-    show_incoming_tab(accounts, incoming, paychecks)
+    show_incoming_tab(accounts, incoming)
 # =========================
 # 💳 ACCOUNTS TAB
 # =========================

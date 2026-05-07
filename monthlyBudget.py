@@ -4,7 +4,7 @@ import plotly.express as px
 import datetime
 
 
-def show_monthly_person(name, accounts, transactions, budget_df = None, paychecks=None):
+def show_monthly_person(name, accounts, incoming, transactions, budget_df = None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 
     monthly_budget = 1380
@@ -70,18 +70,18 @@ def show_monthly_person(name, accounts, transactions, budget_df = None, paycheck
     person_accounts = accounts[accounts["Owner"] == name]
     amount_owed = person_accounts["Total"].sum()
 
-    paychecks["Total"] = pd.to_numeric(paychecks["Total"], errors="coerce")
-    paychecks["Due Date"] = pd.to_datetime(paychecks["Due Date"], errors="coerce")
-
     today = pd.Timestamp.today()
     start_of_month = today.replace(day=1).normalize()
     start_of_next_month = (start_of_month + pd.offsets.MonthBegin(1)).normalize()
 
-    person_paychecks = paychecks[
-        (paychecks["Owner"] == name) &
-        (paychecks["Type"] == "Personal Checking") &
-        (paychecks["Due Date"] >= today.normalize()) &
-        (paychecks["Due Date"] < start_of_next_month)
+    incoming["Due Date"] = pd.to_datetime(incoming["Due Date"], errors="coerce")
+    incoming["Total"] = pd.to_numeric(incoming["Total"], errors="coerce")
+
+    person_paychecks = incoming[
+        (incoming["Owner"] == name) &
+        (incoming["Type"] == "Personal Checking") &
+        (incoming["Due Date"] >= today.normalize()) &
+        (incoming["Due Date"] < start_of_next_month)
     ]
 
     incoming_paychecks_total = person_paychecks["Total"].sum()
