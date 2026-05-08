@@ -27,7 +27,7 @@ def show_incoming_tab(accounts, incoming):
 
     total_incoming = incoming_filtered["Total"].sum()
 
-        # Account balance total
+    # Account balance total
     total_balance = accounts["Total"].sum()
 
     # Projection
@@ -44,17 +44,30 @@ def show_incoming_tab(accounts, incoming):
     col1, col2, col3 = st.columns(3)
 
     col1.metric("💰 Total Incoming", f"${total_incoming:,.2f}")
-    col2.metric("📊 Balance + Incoming", f"${projected_balance:,.2f}")
+    col2.metric("📊 Credit Card Debt + Incoming", f"${projected_balance:,.2f}")
     col3.metric("📅 Projected Through", latest_due_date_text)
 
     st.dataframe(incoming_filtered, use_container_width=True, hide_index=True)
 
-    fig2 = px.bar(
-        incoming_filtered,
+    # ---- Cash Flow Projection ----
+
+    projection_df = incoming_filtered.copy()
+
+    projection_df = projection_df.sort_values("Due Date")
+
+    # Start at credit card debt and accumulate incoming transactions
+    projection_df["Running Balance"] = (-total_balance + projection_df["Total"].cumsum())
+
+    fig2 = px.line(
+        projection_df,
         x="Due Date",
-        y="Total",
-        color="Owner",
-        title="Incoming Transactions"
+        y="Running Balance",
+        markers=True,
+        title="Projected Cash Flow Over Time"
     )
 
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(
+        fig2,
+        use_container_width=True,
+        key="incoming_projection_chart"
+    )

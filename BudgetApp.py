@@ -16,7 +16,7 @@ st.title("💸 Budget App")
 
 num_people = st.radio(
     "How many people are using this budget sheet?",
-    [1, 2],
+    [2, 1],
     horizontal=True
 )
 
