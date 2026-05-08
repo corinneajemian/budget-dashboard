@@ -4,6 +4,7 @@ import plotly.express as px
 import datetime
 from monthlyBudget import show_monthly_person
 from incoming import show_incoming_tab
+from householdHealth import show_household_health
 
 
 st.set_page_config(page_title="Budget App", layout="wide")
@@ -130,11 +131,23 @@ with tab3:
         tx_filtered = transactionsJoint
 
     # --- Budget Setup ---
-    monthly_budget = 1000
+    monthly_budget = 1000  # fallback if Joint is missing
+
+    if budget is not None:
+        budget = budget.copy()
+        budget.columns = budget.columns.str.strip()
+        budget["Owner"] = budget["Owner"].astype(str).str.strip()
+        budget["Budget"] = pd.to_numeric(budget["Budget"], errors="coerce")
+
+        matching_budget = budget.loc[
+            budget["Owner"] == "Joint",
+            "Budget"
+        ]
+
+        if not matching_budget.empty:
+            monthly_budget = matching_budget.iloc[0]
 
     total_spent = tx_filtered["Total"].sum()
-
-    # New remaining calculation
     remaining = monthly_budget - total_spent
 
     # --- Days left in month ---
@@ -246,7 +259,10 @@ with tab5:
 # =========================
 # 💳 ACCOUNTS TAB
 # =========================
-
+with tab6:
+    show_household_health("Household", accounts, incoming, transactions1, budget)
+    if num_people == 2:
+        show_household_health("Household", accounts, incoming, transactions2, budget)
 # =========================
 # ✨ Wishlist
 # =========================

@@ -7,8 +7,6 @@ import datetime
 def show_monthly_person(name, accounts, incoming, transactions, budget_df = None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 
-    monthly_budget = 1380
-
     # If budget sheet was provided, override it
     if budget_df is not None:
         budget_df.columns = budget_df.columns.str.strip()
@@ -99,12 +97,12 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
         value = spend_room
 
     elif spend_room > -200:
-        label = "⚠️ Left to Spend - Around breakeven"
-        value = abs(spend_room)
+        label = "⚠️ Left to Spend - Around Breakeven"
+        value = min(abs(spend_room), remaining)
 
     else:
         label = "✅ Left to Spend This Month"
-        value = abs(spend_room)
+        value = min(abs(spend_room), remaining)
 
     col5.metric(label, f"${value:,.2f}")
     # ---- Pie Chart ----
