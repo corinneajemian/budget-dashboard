@@ -256,13 +256,18 @@ with tab4:
 
 with tab5:
     show_incoming_tab(accounts, incoming)
-# =========================
-# 💳 ACCOUNTS TAB
-# =========================
+
 with tab6:
-    show_household_health("Household", accounts, incoming, transactions1, budget)
-    if num_people == 2:
-        show_household_health("Household", accounts, incoming, transactions2, budget)
+    show_household_health(
+        accounts,
+        incoming,
+        transactions1,
+        transactions2,
+        transactionsJoint,
+        budget,
+        person1_name,
+        person2_name
+    )
 # =========================
 # ✨ Wishlist
 # =========================
