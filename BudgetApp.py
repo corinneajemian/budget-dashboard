@@ -136,11 +136,11 @@ with tab3:
     if budget is not None:
         budget = budget.copy()
         budget.columns = budget.columns.str.strip()
-        budget["Owner"] = budget["Owner"].astype(str).str.strip()
+        budget["Bucket"] = budget["Bucket"].astype(str).str.strip()
         budget["Budget"] = pd.to_numeric(budget["Budget"], errors="coerce")
 
         matching_budget = budget.loc[
-            budget["Owner"] == "Joint",
+            budget["Bucket"] == "Joint",
             "Budget"
         ]
 

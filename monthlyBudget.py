@@ -10,10 +10,10 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     # If budget sheet was provided, override it
     if budget_df is not None:
         budget_df.columns = budget_df.columns.str.strip()
-        budget_df["Owner"] = budget_df["Owner"].astype(str).str.strip()
+        budget_df["Bucket"] = budget_df["Bucket"].astype(str).str.strip()
 
         matching_budget = budget_df.loc[
-            budget_df["Owner"] == name,
+            budget_df["Bucket"] == name,
             "Budget"
         ]
 
@@ -137,6 +137,49 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     else:
         st.info("No data available for selected month")
 
+    # ---- Daily Spending Bar Chart ----
+    st.markdown("### 📅 Spending by Day")
+
+    daily_totals = (
+        tx_filtered
+        .copy()
+        .groupby(tx_filtered["Date"].dt.date)["Total"]
+        .sum()
+        .reset_index()
+    )
+
+    daily_totals["Label"] = pd.to_datetime(daily_totals["Date"]).dt.strftime("%a %b %d")
+
+    daily_totals = daily_totals.sort_values("Date")
+
+    if not daily_totals.empty:
+        average_daily_spend = daily_totals["Total"].mean()
+        fig_daily = px.bar(
+            daily_totals,
+            x="Label",
+            y="Total",
+            title=f"Daily Spending (Avg: ${average_daily_spend:,.2f}/day)",
+            text="Total"
+        )
+
+        fig_daily.update_traces(
+            texttemplate="$%{text:,.2f}",
+            textposition="outside"
+        )
+
+        fig_daily.update_layout(
+            yaxis_title="Amount Spent",
+            xaxis_title="Day"
+        )
+
+        st.plotly_chart(
+            fig_daily,
+            use_container_width=True,
+            key=f"{name.lower()}_daily_spending_bar"
+        )
+
+    else:
+        st.info("No daily spending data available for selected month.")
     st.markdown("### 🧾 Transactions")
 
     st.dataframe(

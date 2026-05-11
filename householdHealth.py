@@ -3,6 +3,36 @@ import pandas as pd
 import plotly.express as px
 import datetime
 
+def make_budget_goal_pie(budget_df, person1_name, person2_name):
+
+    top_level_buckets = [person1_name, person2_name, "Joint"]
+
+    budget_df = budget_df.copy()
+    budget_df.columns = budget_df.columns.str.strip()
+
+    budget_df["Budget"] = pd.to_numeric(
+        budget_df["Budget"],
+        errors="coerce"
+    )
+
+    # Remove personal/joint total rows
+    goal_category_totals = budget_df[
+        ~budget_df["Bucket"].isin(top_level_buckets)
+    ]
+
+    fig_goal = px.pie(
+        goal_category_totals,
+        names="Bucket",
+        values="Budget",
+        title="Budget Goals by Category"
+    )
+
+    fig_goal.update_traces(
+        textinfo="percent+label+value",
+        texttemplate="%{label}<br>%{percent}<br>$%{value:,.2f}"
+    )
+
+    return fig_goal
 
 def show_household_health(
     accounts,
@@ -21,9 +51,9 @@ def show_household_health(
     budget_df = budget_df.copy()
     budget_df.columns = budget_df.columns.str.strip()
 
-    def get_budget(owner_name, fallback):
+    def get_budget(Bucket_name, fallback):
         match = budget_df.loc[
-            budget_df["Owner"] == owner_name,
+            budget_df["Bucket"] == Bucket_name,
             "Budget"
         ]
 
@@ -198,8 +228,11 @@ def show_household_health(
         [person1_table, person2_table, joint_table],
         ignore_index=True
     )
-    # ---- Pie Chart ----
-    category_totals = (
+
+    top_level_buckets = [person1_name, person2_name, "Joint"]
+
+    # Actual spending by category
+    actual_category_totals = (
         combined_transactions
         .groupby("Category")["Total"]
         .sum()
@@ -207,28 +240,49 @@ def show_household_health(
         .sort_values("Total", ascending=False)
     )
 
-    st.markdown("### 💸 Spending Breakdown")
+    # Goal spending by category
+    budget_df = budget_df.copy()
+    budget_df.columns = budget_df.columns.str.strip()
 
-    if not category_totals.empty:
-        fig = px.pie(
-            category_totals,
+    goal_category_totals = budget_df[
+        ~budget_df["Bucket"].isin(top_level_buckets)
+    ].copy()
+
+    goal_category_totals["Budget"] = pd.to_numeric(
+        goal_category_totals["Budget"],
+        errors="coerce"
+    )
+
+    # ---- Pie Chart ----
+    col_chart1, col_chart2 = st.columns(2)
+
+    with col_chart1:
+        fig_actual = px.pie(
+            actual_category_totals,
             names="Category",
             values="Total",
-            title=f"Spending by Category (Total: ${total_spent:,.2f})"
+            title="Actual Spending by Category"
         )
 
-        fig.update_traces(
-            textinfo="percent+label+value",
+        fig_actual.update_traces(
             texttemplate="%{label}<br>%{percent}<br>$%{value:,.2f}"
         )
 
         st.plotly_chart(
-            fig,
+            fig_actual,
             use_container_width=True,
-            key=f"Combined_spending_pie_chart"
+            key="household_actual_category_pie"
         )
-    else:
-        st.info("No data available for selected month")
+
+    with col_chart2:
+        st.markdown("### 🎯 Budget Goals")
+        fig_goal = make_budget_goal_pie(budget_df, person1_name, person2_name)
+
+        st.plotly_chart(
+            fig_goal,
+            use_container_width=True,
+            key="household_budget_goal_pie"
+        )
 
     st.dataframe(
         combined_transactions.sort_values("Date", ascending=False),
