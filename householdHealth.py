@@ -3,6 +3,24 @@ import pandas as pd
 import plotly.express as px
 import datetime
 
+CATEGORY_COLORS = {
+    "Loans": "#1f77b4",
+    "Groceries": "#2ca02c",
+    "Bills": "#ff7f0e",
+    "House": "#8c564b",
+    "Restaurants/Takeout": "#d62728",
+    "Shopping": "#e377c2",
+    "Health/Beauty": "#9467bd",
+    "Alcohol": "#bcbd22",
+    "Freya": "#17becf",
+    "Coffee/Snacks": "#7f7f7f",
+    "Gift": "#f781bf",
+    "Transportation": "#aec7e8",
+    "Auto": "#ffbb78",
+    "Work Commuting": "#98df8a",
+    "Savings": "#c5b0d5",
+}
+
 def make_budget_goal_pie(budget_df, person1_name, person2_name):
 
     top_level_buckets = [person1_name, person2_name, "Joint"]
@@ -24,7 +42,9 @@ def make_budget_goal_pie(budget_df, person1_name, person2_name):
         goal_category_totals,
         names="Bucket",
         values="Budget",
-        title="Budget Goals by Category"
+        title="Budget Goals by Category",
+        color="Bucket",
+        color_discrete_map=CATEGORY_COLORS
     )
 
     fig_goal.update_traces(
@@ -229,6 +249,79 @@ def show_household_health(
         ignore_index=True
     )
 
+    # ---- Daily Household Spending ----
+    st.markdown("### 📅 Household Spending by Day")
+
+    combined_transactions["Date"] = pd.to_datetime(
+        combined_transactions["Date"],
+        errors="coerce"
+    )
+
+    daily_spending = (
+        combined_transactions
+        .copy()
+        .groupby(combined_transactions["Date"].dt.date)["Total"]
+        .sum()
+    )
+
+    # Create full date range for selected month
+    if selected_month != "All":
+        month_start = pd.to_datetime(f"{selected_month}-01")
+        month_end = month_start + pd.offsets.MonthEnd(0)
+
+        full_dates = pd.date_range(
+            start=month_start,
+            end=month_end,
+            freq="D"
+        )
+    else:
+        min_date = combined_transactions["Date"].min()
+        max_date = combined_transactions["Date"].max()
+
+        full_dates = pd.date_range(
+            start=min_date,
+            end=max_date,
+            freq="D"
+        )
+
+    daily_spending = (
+        daily_spending
+        .reindex(full_dates.date, fill_value=0)
+        .reset_index()
+    )
+
+    daily_spending.columns = ["Date", "Total"]
+
+    daily_spending["Label"] = pd.to_datetime(
+        daily_spending["Date"]
+    ).dt.strftime("%a %b %d")
+
+    average_daily_spend = daily_spending["Total"].mean()
+
+    fig_daily_household = px.bar(
+        daily_spending,
+        x="Label",
+        y="Total",
+        title=f"Daily Household Spending (Avg: ${average_daily_spend:,.2f}/day)",
+        text="Total"
+    )
+
+    fig_daily_household.update_traces(
+        texttemplate="$%{text:,.2f}",
+        textposition="outside"
+    )
+
+    fig_daily_household.update_layout(
+        yaxis_title="Amount Spent",
+        xaxis_title="Day"
+    )
+
+    st.plotly_chart(
+        fig_daily_household,
+        use_container_width=True,
+        key="household_daily_spending_chart"
+    )
+
     top_level_buckets = [person1_name, person2_name, "Joint"]
 
     # Actual spending by category
@@ -261,7 +354,9 @@ def show_household_health(
             actual_category_totals,
             names="Category",
             values="Total",
-            title="Actual Spending by Category"
+            title="Actual Spending by Category",
+            color="Category",
+            color_discrete_map=CATEGORY_COLORS
         )
 
         fig_actual.update_traces(
@@ -283,9 +378,3 @@ def show_household_health(
             use_container_width=True,
             key="household_budget_goal_pie"
         )
-
-    st.dataframe(
-        combined_transactions.sort_values("Date", ascending=False),
-        use_container_width=True,
-        hide_index=True
-    )

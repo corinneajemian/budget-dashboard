@@ -91,18 +91,23 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     col4, col5 = st.columns(2)
 
     col4.metric(f"💳 {name} Debt", f"${amount_owed:,.2f}")
-
-    if spend_room > 0:
+    
+    # If remaining budget is negative, 'Still Need to Cover' is just the debt
+    if remaining < 0:
         label = "❌ Still Need to Cover"
-        value = spend_room
-
-    elif spend_room > -200:
-        label = "⚠️ Left to Spend - Around Breakeven"
-        value = min(abs(spend_room), remaining)
-
+        value = amount_owed
     else:
-        label = "✅ Left to Spend This Month"
-        value = min(abs(spend_room), remaining)
+        # Debt - Remaining Budget - Incoming Paychecks
+        spend_room = amount_owed - remaining - incoming_paychecks_total
+        if spend_room > 0:
+            label = "❌ Still Need to Cover"
+            value = spend_room
+        elif spend_room > -200:
+            label = "⚠️ Left to Spend - Around Breakeven"
+            value = min(abs(spend_room), remaining)
+        else:
+            label = "✅ Left to Spend This Month"
+            value = min(abs(spend_room), remaining)
 
     col5.metric(label, f"${value:,.2f}")
     # ---- Pie Chart ----
@@ -180,10 +185,73 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
 
     else:
         st.info("No daily spending data available for selected month.")
-    st.markdown("### 🧾 Transactions")
 
-    st.dataframe(
-        tx_filtered.sort_values("Date", ascending=False),
+    # ---- Daily Spending Bar Chart ----
+    st.markdown("### 📅 Spending by Day")
+
+    tx_filtered["Date"] = pd.to_datetime(tx_filtered["Date"], errors="coerce")
+
+    daily_spending = (
+        tx_filtered
+        .copy()
+        .groupby(tx_filtered["Date"].dt.date)["Total"]
+        .sum()
+    )
+
+    # Create full date range for selected month
+    if selected_month != "All":
+        month_start = pd.to_datetime(f"{selected_month}-01")
+        month_end = month_start + pd.offsets.MonthEnd(0)
+
+        full_dates = pd.date_range(
+            start=month_start,
+            end=month_end,
+            freq="D"
+        )
+    else:
+        min_date = tx_filtered["Date"].min()
+        max_date = tx_filtered["Date"].max()
+
+        full_dates = pd.date_range(
+            start=min_date,
+            end=max_date,
+            freq="D"
+        )
+
+    daily_spending = (
+        daily_spending
+        .reindex(full_dates.date, fill_value=0)
+        .reset_index()
+    )
+
+    daily_spending.columns = ["Date", "Total"]
+
+    daily_spending["Label"] = pd.to_datetime(
+        daily_spending["Date"]
+    ).dt.strftime("%a %b %d")
+
+    average_daily_spend = daily_spending["Total"].mean()
+
+    fig_daily = px.bar(
+        daily_spending,
+        x="Label",
+        y="Total",
+        title=f"Daily Spending (Avg: ${average_daily_spend:,.2f}/day)",
+        text="Total"
+    )
+
+    fig_daily.update_traces(
+        texttemplate="$%{text:,.2f}",
+        textposition="outside"
+    )
+
+    fig_daily.update_layout(
+        yaxis_title="Amount Spent",
+        xaxis_title="Day"
+    )
+
+    st.plotly_chart(
+        fig_daily,
         use_container_width=True,
-        hide_index=True
+        key=f"{name.lower()}_daily_spending_chart"
     )
