@@ -55,6 +55,13 @@ except FileNotFoundError:
     st.error(f"Could not find `{data_source}`.")
     st.stop()
 
+except PermissionError:
+    st.error(
+        f"Could not open `{data_source}` because it is being used by another program. "
+        "Close the Excel file, wait a moment for OneDrive to finish syncing, then refresh this page."
+    )
+    st.stop()
+
 except ValueError as e:
     st.error(f"Excel sheet error: {e}")
     st.stop()

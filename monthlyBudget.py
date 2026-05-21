@@ -145,50 +145,6 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     # ---- Daily Spending Bar Chart ----
     st.markdown("### 📅 Spending by Day")
 
-    daily_totals = (
-        tx_filtered
-        .copy()
-        .groupby(tx_filtered["Date"].dt.date)["Total"]
-        .sum()
-        .reset_index()
-    )
-
-    daily_totals["Label"] = pd.to_datetime(daily_totals["Date"]).dt.strftime("%a %b %d")
-
-    daily_totals = daily_totals.sort_values("Date")
-
-    if not daily_totals.empty:
-        average_daily_spend = daily_totals["Total"].mean()
-        fig_daily = px.bar(
-            daily_totals,
-            x="Label",
-            y="Total",
-            title=f"Daily Spending (Avg: ${average_daily_spend:,.2f}/day)",
-            text="Total"
-        )
-
-        fig_daily.update_traces(
-            texttemplate="$%{text:,.2f}",
-            textposition="outside"
-        )
-
-        fig_daily.update_layout(
-            yaxis_title="Amount Spent",
-            xaxis_title="Day"
-        )
-
-        st.plotly_chart(
-            fig_daily,
-            use_container_width=True,
-            key=f"{name.lower()}_daily_spending_bar"
-        )
-
-    else:
-        st.info("No daily spending data available for selected month.")
-
-    # ---- Daily Spending Bar Chart ----
-    st.markdown("### 📅 Spending by Day")
-
     tx_filtered["Date"] = pd.to_datetime(tx_filtered["Date"], errors="coerce")
 
     daily_spending = (
