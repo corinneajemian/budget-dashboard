@@ -211,3 +211,13 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
         use_container_width=True,
         key=f"{name.lower()}_daily_spending_chart"
     )
+
+        # ---- TRANSACTION TABLE ----
+    st.markdown("### 🧾 Transactions")
+
+    st.dataframe(
+        tx_filtered.sort_values("Date", ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
+    st.metric("Total Spent", f"${tx_filtered['Total'].sum():,.2f}")

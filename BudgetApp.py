@@ -319,22 +319,162 @@ with tab7:
         .sort_values("Cost", ascending=False)
     )
 
-    st.markdown("### 💸 Wishlist by Category")
+    st.markdown("### 💸 Wishlist vs Budget by Category")
 
-    if not category_totals.empty:
-        fig_wishlist = px.pie(
-            category_totals,
-            names="Category",
-            values="Cost",
-            title=f"Wishlist by Category (Total: ${total_wishlist:,.2f})"
+    budget_by_category = budget.copy()
+    budget_by_category.columns = budget_by_category.columns.str.strip()
+    budget_by_category["Bucket"] = budget_by_category["Bucket"].astype(str).str.strip()
+    budget_by_category["Budget"] = pd.to_numeric(
+        budget_by_category["Budget"],
+        errors="coerce"
+    ).fillna(0)
+
+    top_level_buckets = [person1_name, "Joint"]
+
+    if person2_name is not None:
+        top_level_buckets.append(person2_name)
+
+    budget_by_category = (
+        budget_by_category[
+            ~budget_by_category["Bucket"].isin(top_level_buckets)
+        ]
+        .groupby("Bucket")["Budget"]
+        .sum()
+        .reset_index()
+        .rename(columns={
+            "Bucket": "Category",
+            "Budget": "How much we budgeted for each category"
+        })
+    )
+
+    wishlist_budget_table = (
+        category_totals.rename(
+            columns={"Cost": "How much we wish to spend in each category"}
+        )
+        .merge(budget_by_category, on="Category", how="outer")
+        .fillna(0)
+    )
+
+    wishlist_budget_table["Amount left to spend"] = (
+        wishlist_budget_table["How much we budgeted for each category"]
+        - wishlist_budget_table["How much we wish to spend in each category"]
+    )
+
+    adjustment_exempt_categories = ["Groceries"]
+
+    total_over_budget = abs(
+        wishlist_budget_table.loc[
+            wishlist_budget_table["Amount left to spend"] < 0,
+            "Amount left to spend"
+        ].sum()
+    )
+
+    total_available_room = wishlist_budget_table.loc[
+        (
+            wishlist_budget_table["Amount left to spend"] > 0
+        ) & (
+            ~wishlist_budget_table["Category"].isin(adjustment_exempt_categories)
+        ),
+        "Amount left to spend"
+    ].sum()
+
+    wishlist_budget_table["Adjustment amount"] = 0.0
+
+    if total_over_budget > 0 and total_available_room > 0:
+        has_room = (
+            wishlist_budget_table["Amount left to spend"] > 0
+        ) & (
+            ~wishlist_budget_table["Category"].isin(adjustment_exempt_categories)
+        )
+        wishlist_budget_table.loc[has_room, "Adjustment amount"] = (
+            wishlist_budget_table.loc[has_room, "Amount left to spend"]
+            / total_available_room
+            * total_over_budget
+            * -1
         )
 
-        fig_wishlist.update_traces(
-            textinfo="percent+label+value",
-            texttemplate="%{label}<br>%{percent}<br>$%{value:,.2f}"
-        )
+    wishlist_budget_table["Amount left after adjustment"] = (
+        wishlist_budget_table["Amount left to spend"]
+        + wishlist_budget_table["Adjustment amount"]
+    ).round(2)
 
-        st.plotly_chart(fig_wishlist, use_container_width=True)
+    money_columns = [
+        "How much we budgeted for each category",
+        "How much we wish to spend in each category",
+        "Amount left to spend"
+    ]
+
+    wishlist_budget_table[money_columns] = wishlist_budget_table[money_columns].round(2)
+
+    wishlist_budget_table = wishlist_budget_table.sort_values(
+        "How much we wish to spend in each category",
+        ascending=False
+    ).set_index("Category")
+
+    wishlist_budget_table = wishlist_budget_table[
+        [
+            "How much we budgeted for each category",
+            "How much we wish to spend in each category",
+            "Amount left to spend",
+            "Amount left after adjustment"
+        ]
+    ]
+
+    total_values = wishlist_budget_table.sum(numeric_only=True)
+    total_values["Amount left to spend"] = wishlist_budget_table[
+        "Amount left to spend"
+    ].clip(lower=0).sum()
+    total_values["Amount left after adjustment"] = wishlist_budget_table[
+        "Amount left after adjustment"
+    ].clip(lower=0).sum()
+
+    total_row = pd.DataFrame([total_values], index=["Total"])
+
+    wishlist_budget_table = pd.concat([wishlist_budget_table, total_row])
+
+    def highlight_wishlist_difference(row):
+        budgeted = row["How much we budgeted for each category"]
+        wished = row["How much we wish to spend in each category"]
+        difference = row["Amount left to spend"]
+
+        if budgeted == 0:
+            color = "#c62828" if wished > 0 else "#616161"
+        elif difference >= 0:
+            color = "#2e7d32"
+        elif difference >= budgeted * -0.10:
+            color = "#f57c00"
+        else:
+            color = "#c62828"
+
+        return [f"color: {color}; font-weight: 600"] * len(row)
+
+    if not wishlist_budget_table.empty:
+        st.dataframe(
+            wishlist_budget_table
+            .style
+            .apply(highlight_wishlist_difference, axis=1)
+            .set_table_styles([
+                {
+                    "selector": "th",
+                    "props": [
+                        ("white-space", "normal"),
+                        ("word-wrap", "break-word"),
+                        ("max-width", "120px")
+                    ]
+                }
+            ])
+            .format({
+                "How much we budgeted for each category": "${:,.2f}",
+                "How much we wish to spend in each category": "${:,.2f}",
+                "Amount left to spend": lambda value: (
+                    f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
+                ),
+                "Amount left after adjustment": lambda value: (
+                    f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
+                )
+            }),
+            use_container_width=True
+        )
     else:
         st.info("No wishlist items match your filters.")
 

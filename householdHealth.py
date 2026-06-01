@@ -296,6 +296,22 @@ def show_household_health(
         daily_spending["Date"]
     ).dt.strftime("%a %b %d")
 
+    daily_spending["Cumulative Total"] = daily_spending["Total"].cumsum()
+
+    daily_dates = pd.to_datetime(daily_spending["Date"])
+    known_first_day_expenses = 1000
+    days_in_month = daily_dates.dt.days_in_month
+    remaining_budget_after_known_expenses = total_budget - known_first_day_expenses
+
+    daily_spending["Budget Pace"] = (
+        known_first_day_expenses
+        + (
+            remaining_budget_after_known_expenses
+            / (days_in_month - 1).clip(lower=1)
+            * (daily_dates.dt.day - 1)
+        )
+    )
+
     average_daily_spend = daily_spending["Total"].mean()
 
     fig_daily_household = px.bar(
@@ -311,9 +327,29 @@ def show_household_health(
         textposition="outside"
     )
 
+    fig_daily_household.add_scatter(
+        x=daily_spending["Label"],
+        y=daily_spending["Cumulative Total"],
+        mode="lines+markers",
+        name="Cumulative Month-to-Date",
+        line={"color": "#c62828", "width": 3},
+        marker={"size": 7},
+        hovertemplate="Cumulative: $%{y:,.2f}<extra></extra>"
+    )
+
+    fig_daily_household.add_scatter(
+        x=daily_spending["Label"],
+        y=daily_spending["Budget Pace"],
+        mode="lines",
+        name="Budget Pace",
+        line={"color": "#2e7d32", "width": 3, "dash": "dash"},
+        hovertemplate="Budget pace: $%{y:,.2f}<extra></extra>"
+    )
+
     fig_daily_household.update_layout(
         yaxis_title="Amount Spent",
-        xaxis_title="Day"
+        xaxis_title="Day",
+        legend_title_text=""
     )
 
     st.plotly_chart(
