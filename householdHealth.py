@@ -99,30 +99,58 @@ def show_household_health(
         set(transactions2["Date"].dt.to_period("M").astype(str).dropna()) |
         set(transactionsJoint["Date"].dt.to_period("M").astype(str).dropna())
     )
+    current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
+    historical_months = [
+        month
+        for month in all_months
+        if month != current_month
+    ]
 
     selected_month = st.selectbox(
         "Filter by month",
-        ["All"] + all_months,
-        key="household_month_filter"
+        ["Current month", "All"] + historical_months,
+        key="household_current_month_filter"
+    )
+
+    selected_month_value = (
+        current_month if selected_month == "Current month" else selected_month
     )
 
     def filter_by_month(df):
         df = df.copy()
         df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-        if selected_month != "All":
-            return df[df["Month"] == selected_month]
+        if selected_month_value != "All":
+            return df[df["Month"] == selected_month_value]
 
         return df
+
+    def without_credit_card_payoffs(df):
+        if "Category" not in df.columns:
+            return df
+
+        is_credit_card_payoff = (
+            df["Category"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == "pay off credit cards"
+        )
+
+        return df[~is_credit_card_payoff]
 
     person1_filtered = filter_by_month(transactions1)
     person2_filtered = filter_by_month(transactions2)
     joint_filtered = filter_by_month(transactionsJoint)
 
+    person1_spending = without_credit_card_payoffs(person1_filtered)
+    person2_spending = without_credit_card_payoffs(person2_filtered)
+    joint_spending = without_credit_card_payoffs(joint_filtered)
+
     # ---- Totals ----
-    person1_spent = person1_filtered["Total"].sum()
-    person2_spent = person2_filtered["Total"].sum()
-    joint_spent = joint_filtered["Total"].sum()
+    person1_spent = person1_spending["Total"].sum()
+    person2_spent = person2_spending["Total"].sum()
+    joint_spent = joint_spending["Total"].sum()
 
     total_spent = person1_spent + person2_spent + joint_spent
 
@@ -257,16 +285,56 @@ def show_household_health(
         errors="coerce"
     )
 
+    if "Plan Ahead" in combined_transactions.columns:
+        plan_ahead_values = (
+            combined_transactions["Plan Ahead"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+        combined_transactions["Is Plan Ahead"] = plan_ahead_values.isin(
+            ["yes", "y", "true", "1"]
+        )
+    else:
+        combined_transactions["Is Plan Ahead"] = False
+
+    if "Category" in combined_transactions.columns:
+        category_values = (
+            combined_transactions["Category"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+        combined_transactions["Is Pay Off Credit Cards"] = (
+            category_values == "pay off credit cards"
+        )
+    else:
+        combined_transactions["Is Pay Off Credit Cards"] = False
+
+    spending_transactions = combined_transactions[
+        ~combined_transactions["Is Pay Off Credit Cards"]
+    ].copy()
+
     daily_spending = (
-        combined_transactions
+        spending_transactions
         .copy()
-        .groupby(combined_transactions["Date"].dt.date)["Total"]
+        .groupby(spending_transactions["Date"].dt.date)["Total"]
+        .sum()
+    )
+
+    daily_spending_without_plan_ahead = (
+        spending_transactions[~spending_transactions["Is Plan Ahead"]]
+        .copy()
+        .groupby(spending_transactions.loc[
+            ~spending_transactions["Is Plan Ahead"],
+            "Date"
+        ].dt.date)["Total"]
         .sum()
     )
 
     # Create full date range for selected month
-    if selected_month != "All":
-        month_start = pd.to_datetime(f"{selected_month}-01")
+    if selected_month_value != "All":
+        month_start = pd.to_datetime(f"{selected_month_value}-01")
         month_end = month_start + pd.offsets.MonthEnd(0)
 
         full_dates = pd.date_range(
@@ -292,14 +360,23 @@ def show_household_health(
 
     daily_spending.columns = ["Date", "Total"]
 
+    daily_spending["Total Without Plan Ahead"] = (
+        daily_spending_without_plan_ahead
+        .reindex(full_dates.date, fill_value=0)
+        .to_numpy()
+    )
+
     daily_spending["Label"] = pd.to_datetime(
         daily_spending["Date"]
     ).dt.strftime("%a %b %d")
 
     daily_spending["Cumulative Total"] = daily_spending["Total"].cumsum()
+    daily_spending["Cumulative Without Plan Ahead"] = (
+        daily_spending["Total Without Plan Ahead"].cumsum()
+    )
 
     daily_dates = pd.to_datetime(daily_spending["Date"])
-    known_first_day_expenses = 1000
+    known_first_day_expenses = 0
     days_in_month = daily_dates.dt.days_in_month
     remaining_budget_after_known_expenses = total_budget - known_first_day_expenses
 
@@ -339,6 +416,16 @@ def show_household_health(
 
     fig_daily_household.add_scatter(
         x=daily_spending["Label"],
+        y=daily_spending["Cumulative Without Plan Ahead"],
+        mode="lines+markers",
+        name="Cumulative Without Plan Ahead",
+        line={"color": "#7b1fa2", "width": 3},
+        marker={"size": 7},
+        hovertemplate="Without Plan Ahead: $%{y:,.2f}<extra></extra>"
+    )
+
+    fig_daily_household.add_scatter(
+        x=daily_spending["Label"],
         y=daily_spending["Budget Pace"],
         mode="lines",
         name="Budget Pace",
@@ -362,7 +449,7 @@ def show_household_health(
 
     # Actual spending by category
     actual_category_totals = (
-        combined_transactions
+        spending_transactions
         .groupby("Category")["Total"]
         .sum()
         .reset_index()
