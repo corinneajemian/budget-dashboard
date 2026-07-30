@@ -257,8 +257,8 @@ def show_annual_spending_progress(transactions, budget_df, incoming=None):
     
     # Hardcoded annual budgets for specific categories
     hardcoded_budgets = {
-        "Travel": 8500,
-        "Loans": 17000
+        "Travel": 5000,
+        "Loans": 2000
     }
     
     # Clean transactions
