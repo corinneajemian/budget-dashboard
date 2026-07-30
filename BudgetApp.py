@@ -5,6 +5,7 @@ import datetime
 from monthlyBudget import show_monthly_person
 from incoming import show_incoming_tab
 from householdHealth import show_household_health
+from yearlyBudget import show_joint_yearly_budget, filter_monthly_categories, show_annual_spending_progress
 
 
 st.set_page_config(page_title="Budget App", layout="wide")
@@ -49,7 +50,6 @@ try:
         transactions2 = pd.read_excel(data_source, sheet_name=person2_sheet)
 
     transactionsJoint = pd.read_excel(data_source, sheet_name="SpendingJoint")
-    wishlist = pd.read_excel(data_source, sheet_name="Wishlist")
 
 except FileNotFoundError:
     st.error(f"Could not find `{data_source}`.")
@@ -65,8 +65,6 @@ except PermissionError:
 except ValueError as e:
     st.error(f"Excel sheet error: {e}")
     st.stop()
-
-wishlist["Cost"] = pd.to_numeric(wishlist["Cost"], errors="coerce")
 
 # ---- Clean Accounts ----
 accounts["Total"] = pd.to_numeric(accounts["Total"], errors="coerce")
@@ -85,8 +83,9 @@ if num_people == 2:
 
 tab_names.extend([
     "🥧 Joint Monthly Budget",
-    "💳 Accounts",
-    "📅 Incoming",
+    "📅 Joint Yearly Budget",
+    "� Annual Spending Progress",
+    "�💳 Accounts",
     "🏡 Household Health",
     "✨ Wishlist"
 ])
@@ -96,17 +95,19 @@ tab1 = tabs[0]
 
 if num_people == 2:
     tab2 = tabs[1]
-    tab3 = tabs[2]
-    tab4 = tabs[3]
-    tab5 = tabs[4]
-    tab6 = tabs[5]
-    tab7 = tabs[6]
+    tab_joint_monthly = tabs[2]
+    tab_joint_yearly = tabs[3]
+    tab_annual_progress = tabs[4]
+    tab_accounts = tabs[5]
+    tab_household = tabs[6]
+    tab_wishlist = tabs[7]
 else:
-    tab3 = tabs[1]
-    tab4 = tabs[2]
-    tab5 = tabs[3]
-    tab6 = tabs[4]
-    tab7 = tabs[5]
+    tab_joint_monthly = tabs[1]
+    tab_joint_yearly = tabs[2]
+    tab_annual_progress = tabs[3]
+    tab_accounts = tabs[4]
+    tab_household = tabs[5]
+    tab_wishlist = tabs[6]
 
 with tab1:
     show_monthly_person(person1_name, accounts, incoming, transactions1, budget)
@@ -114,28 +115,42 @@ with tab1:
 if num_people == 2:
     with tab2:
         show_monthly_person(person2_name, accounts, incoming, transactions2, budget)
+
 # =========================
 # 📅 Monthly Budget Joint
 # =========================
-with tab3:
+with tab_joint_monthly:
     st.subheader("🥧 Joint Monthly Spending by Category")
 
-    transactionsJoint["Date"] = pd.to_datetime(transactionsJoint["Date"], errors="coerce")
-    transactionsJoint["Total"] = pd.to_numeric(transactionsJoint["Total"], errors="coerce")
+    transactionsJoint_monthly = filter_monthly_categories(transactionsJoint)
+    transactionsJoint_monthly["Date"] = pd.to_datetime(transactionsJoint_monthly["Date"], errors="coerce")
+    transactionsJoint_monthly["Total"] = pd.to_numeric(transactionsJoint_monthly["Total"], errors="coerce")
 
     # Optional: month filter
-    transactionsJoint["Month"] = transactionsJoint["Date"].dt.to_period("M").astype(str)
-    month_options = ["All"] + sorted(transactionsJoint["Month"].dropna().unique().tolist())
+    transactionsJoint_monthly["Month"] = transactionsJoint_monthly["Date"].dt.to_period("M").astype(str)
+    current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
+    historical_months = [
+        month
+        for month in sorted(transactionsJoint_monthly["Month"].dropna().unique().tolist())
+        if month != current_month
+    ]
+    month_options = ["Current month", "All"] + historical_months
     selected_month = st.selectbox(
         "Filter by month",
         month_options,
-        key="joint_month_filter"
+        key="joint_current_month_filter"
     )
 
-    if selected_month != "All":
-        tx_filtered = transactionsJoint[transactionsJoint["Month"] == selected_month]
+    selected_month_value = (
+        current_month if selected_month == "Current month" else selected_month
+    )
+
+    if selected_month_value != "All":
+        tx_filtered = transactionsJoint_monthly[
+            transactionsJoint_monthly["Month"] == selected_month_value
+        ]
     else:
-        tx_filtered = transactionsJoint
+        tx_filtered = transactionsJoint_monthly
 
     # --- Budget Setup ---
     monthly_budget = 1000  # fallback if Joint is missing
@@ -226,7 +241,23 @@ with tab3:
     )
     st.metric("Total Spent", f"${tx_filtered['Total'].sum():,.2f}")
 
-with tab4:
+# =========================
+# 📅 Yearly Budget Joint
+# =========================
+with tab_joint_yearly:
+    # Combine all transactions for yearly budget
+    all_transactions = pd.concat([transactions1, transactions2, transactionsJoint], ignore_index=True)
+    show_joint_yearly_budget(all_transactions)
+
+# =========================
+# 📈 Annual Spending Progress
+# =========================
+with tab_annual_progress:
+    # Combine all transactions for annual progress
+    all_transactions = pd.concat([transactions1, transactions2, transactionsJoint], ignore_index=True)
+    show_annual_spending_progress(all_transactions, budget, incoming)
+
+with tab_accounts:
     st.subheader("Accounts")
 
     st.dataframe(accounts, use_container_width=True, hide_index=True)
@@ -261,16 +292,13 @@ with tab4:
 
     st.plotly_chart(fig, use_container_width=True)
 
-with tab5:
-    show_incoming_tab(accounts, incoming)
-
-with tab6:
+with tab_household:
     show_household_health(
         accounts,
         incoming,
-        transactions1,
-        transactions2,
-        transactionsJoint,
+        filter_monthly_categories(transactions1),
+        filter_monthly_categories(transactions2),
+        filter_monthly_categories(transactionsJoint),
         budget,
         person1_name,
         person2_name
@@ -278,34 +306,95 @@ with tab6:
 # =========================
 # ✨ Wishlist
 # =========================
-with tab7:
+with tab_wishlist:
     st.subheader("✨ Wishlist")
 
-    wishlist["Cost"] = pd.to_numeric(wishlist["Cost"], errors="coerce")
+    wishlist_sources = []
 
-    owner_options = ["All"] + sorted(wishlist["Owner"].dropna().unique().tolist())
+    person1_wishlist = transactions1.copy()
+    person1_wishlist["Budget Bucket"] = person1_name
+    wishlist_sources.append(person1_wishlist)
+
+    if num_people == 2:
+        person2_wishlist = transactions2.copy()
+        person2_wishlist["Budget Bucket"] = person2_name
+        wishlist_sources.append(person2_wishlist)
+
+    joint_wishlist = transactionsJoint.copy()
+    joint_wishlist["Budget Bucket"] = "Joint"
+    wishlist_sources.append(joint_wishlist)
+
+    wishlist = pd.concat(wishlist_sources, ignore_index=True)
+    wishlist.columns = wishlist.columns.str.strip()
+
+    if "Plan Ahead" not in wishlist.columns:
+        st.info(
+            "Add a `Plan Ahead` column to the spending tabs and enter `Yes` "
+            "for rows you want to include here."
+        )
+        st.stop()
+
+    wishlist["Date"] = pd.to_datetime(wishlist["Date"], errors="coerce")
+    wishlist["Total"] = pd.to_numeric(wishlist["Total"], errors="coerce").fillna(0)
+    wishlist["Plan Ahead"] = wishlist["Plan Ahead"].astype(str).str.strip().str.lower()
+    wishlist["Is Plan Ahead"] = wishlist["Plan Ahead"].isin(["yes", "y", "true", "1"])
+    wishlist["Month"] = wishlist["Date"].dt.to_period("M").astype(str)
+
+    current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
+    historical_months = [
+        month
+        for month in sorted(wishlist["Month"].dropna().unique().tolist())
+        if month not in [current_month, "NaT"]
+    ]
+    month_options = ["Current month", "All"] + historical_months
+    selected_month = st.selectbox(
+        "Filter by month",
+        month_options,
+        key="wishlist_current_month_filter"
+    )
+
+    selected_month_value = (
+        current_month if selected_month == "Current month" else selected_month
+    )
+
+    if selected_month_value != "All":
+        wishlist = wishlist[wishlist["Month"] == selected_month_value]
+
+    owner_column = "Owner" if "Owner" in wishlist.columns else "Budget Bucket"
+    owner_options = ["All"] + sorted(wishlist[owner_column].dropna().unique().tolist())
     selected_owner = st.selectbox(
         "Filter by owner",
         owner_options,
         key="wishlist_owner_filter"
     )
 
-    priority_options = ["All"] + sorted(wishlist["Priority"].dropna().unique().tolist())
-    selected_priority = st.selectbox(
-        "Filter by priority",
-        priority_options,
-        key="wishlist_priority_filter"
-    )
-
     wishlist_filtered = wishlist.copy()
 
     if selected_owner != "All":
-        wishlist_filtered = wishlist_filtered[wishlist_filtered["Owner"] == selected_owner]
+        wishlist_filtered = wishlist_filtered[
+            wishlist_filtered[owner_column] == selected_owner
+        ]
 
-    if selected_priority != "All":
-        wishlist_filtered = wishlist_filtered[wishlist_filtered["Priority"] == selected_priority]
+    if "Priority" in wishlist.columns:
+        priority_options = ["All"] + sorted(wishlist["Priority"].dropna().unique().tolist())
+        selected_priority = st.selectbox(
+            "Filter by priority",
+            priority_options,
+            key="wishlist_priority_filter"
+        )
 
-    total_wishlist = wishlist_filtered["Cost"].sum()
+        if selected_priority != "All":
+            wishlist_filtered = wishlist_filtered[
+                wishlist_filtered["Priority"] == selected_priority
+            ]
+
+    spending_filtered = wishlist_filtered.copy()
+    wishlist_filtered = spending_filtered[spending_filtered["Is Plan Ahead"]].copy()
+    actual_spending_filtered = spending_filtered[
+        ~spending_filtered["Is Plan Ahead"]
+    ].copy()
+
+    total_wishlist = wishlist_filtered["Total"].sum()
 
     col1, col2 = st.columns(2)
     col1.metric("🛍️ Wishlist Total", f"${total_wishlist:,.2f}")
@@ -313,10 +402,18 @@ with tab7:
 
     category_totals = (
         wishlist_filtered
-        .groupby("Category")["Cost"]
+        .groupby("Category")["Total"]
         .sum()
         .reset_index()
-        .sort_values("Cost", ascending=False)
+        .sort_values("Total", ascending=False)
+    )
+
+    actual_category_totals = (
+        actual_spending_filtered
+        .groupby("Category")["Total"]
+        .sum()
+        .reset_index()
+        .rename(columns={"Total": "Spent this month"})
     )
 
     st.markdown("### 💸 Wishlist vs Budget by Category")
@@ -343,89 +440,94 @@ with tab7:
         .reset_index()
         .rename(columns={
             "Bucket": "Category",
-            "Budget": "How much we budgeted for each category"
+            "Budget": "Budget"
         })
     )
 
     wishlist_budget_table = (
         category_totals.rename(
-            columns={"Cost": "How much we wish to spend in each category"}
+            columns={"Total": "Planned"}
         )
         .merge(budget_by_category, on="Category", how="outer")
+        .merge(actual_category_totals, on="Category", how="outer")
         .fillna(0)
+        .rename(columns={"Spent this month": "Spent"})
     )
 
-    wishlist_budget_table["Amount left to spend"] = (
-        wishlist_budget_table["How much we budgeted for each category"]
-        - wishlist_budget_table["How much we wish to spend in each category"]
+    wishlist_budget_table["Left"] = (
+        wishlist_budget_table["Budget"]
+        - wishlist_budget_table["Spent"]
+        - wishlist_budget_table["Planned"]
     )
 
     adjustment_exempt_categories = ["Groceries"]
 
     total_over_budget = abs(
         wishlist_budget_table.loc[
-            wishlist_budget_table["Amount left to spend"] < 0,
-            "Amount left to spend"
+            wishlist_budget_table["Left"] < 0,
+            "Left"
         ].sum()
     )
 
     total_available_room = wishlist_budget_table.loc[
         (
-            wishlist_budget_table["Amount left to spend"] > 0
+            wishlist_budget_table["Left"] > 0
         ) & (
             ~wishlist_budget_table["Category"].isin(adjustment_exempt_categories)
         ),
-        "Amount left to spend"
+        "Left"
     ].sum()
 
     wishlist_budget_table["Adjustment amount"] = 0.0
 
     if total_over_budget > 0 and total_available_room > 0:
         has_room = (
-            wishlist_budget_table["Amount left to spend"] > 0
+            wishlist_budget_table["Left"] > 0
         ) & (
             ~wishlist_budget_table["Category"].isin(adjustment_exempt_categories)
         )
         wishlist_budget_table.loc[has_room, "Adjustment amount"] = (
-            wishlist_budget_table.loc[has_room, "Amount left to spend"]
+            wishlist_budget_table.loc[has_room, "Left"]
             / total_available_room
             * total_over_budget
             * -1
         )
 
-    wishlist_budget_table["Amount left after adjustment"] = (
-        wishlist_budget_table["Amount left to spend"]
+    wishlist_budget_table["Adjusted Left"] = (
+        wishlist_budget_table["Left"]
         + wishlist_budget_table["Adjustment amount"]
     ).round(2)
 
     money_columns = [
-        "How much we budgeted for each category",
-        "How much we wish to spend in each category",
-        "Amount left to spend"
+        "Budget",
+        "Spent",
+        "Planned",
+        "Left"
     ]
 
     wishlist_budget_table[money_columns] = wishlist_budget_table[money_columns].round(2)
 
     wishlist_budget_table = wishlist_budget_table.sort_values(
-        "How much we wish to spend in each category",
+        "Planned",
         ascending=False
     ).set_index("Category")
 
     wishlist_budget_table = wishlist_budget_table[
         [
-            "How much we budgeted for each category",
-            "How much we wish to spend in each category",
-            "Amount left to spend",
-            "Amount left after adjustment"
+            "Budget",
+            "Spent",
+            "Planned",
+            "Left",
+            "Adjusted Left"
         ]
     ]
 
     total_values = wishlist_budget_table.sum(numeric_only=True)
-    total_values["Amount left to spend"] = wishlist_budget_table[
-        "Amount left to spend"
+    total_values["Left"] = wishlist_budget_table[
+        "Left"
     ].clip(lower=0).sum()
-    total_values["Amount left after adjustment"] = wishlist_budget_table[
-        "Amount left after adjustment"
+    total_values["Adjusted Left"] = wishlist_budget_table[
+        "Adjusted Left"
     ].clip(lower=0).sum()
 
     total_row = pd.DataFrame([total_values], index=["Total"])
@@ -433,12 +535,12 @@ with tab7:
     wishlist_budget_table = pd.concat([wishlist_budget_table, total_row])
 
     def highlight_wishlist_difference(row):
-        budgeted = row["How much we budgeted for each category"]
-        wished = row["How much we wish to spend in each category"]
-        difference = row["Amount left to spend"]
+        budgeted = row["Budget"]
+        planned = row["Planned"]
+        difference = row["Left"]
 
         if budgeted == 0:
-            color = "#c62828" if wished > 0 else "#616161"
+            color = "#c62828" if planned > 0 else "#616161"
         elif difference >= 0:
             color = "#2e7d32"
         elif difference >= budgeted * -0.10:
@@ -464,12 +566,13 @@ with tab7:
                 }
             ])
             .format({
-                "How much we budgeted for each category": "${:,.2f}",
-                "How much we wish to spend in each category": "${:,.2f}",
-                "Amount left to spend": lambda value: (
+                "Budget": "${:,.2f}",
+                "Spent": "${:,.2f}",
+                "Planned": "${:,.2f}",
+                "Left": lambda value: (
                     f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
                 ),
-                "Amount left after adjustment": lambda value: (
+                "Adjusted Left": lambda value: (
                     f"${value:,.2f}" if value >= 0 else f"-${abs(value):,.2f}"
                 )
             }),
@@ -480,8 +583,33 @@ with tab7:
 
     st.markdown("### 🧾 Wishlist Items")
 
+    wishlist_item_columns = [
+        "Date",
+        "Budget Bucket",
+        "Owner",
+        "Category",
+        "Description",
+        "Item",
+        "Name",
+        "Vendor",
+        "Priority",
+        "Notes",
+        "Total"
+    ]
+    wishlist_item_columns = [
+        column
+        for column in wishlist_item_columns
+        if column in wishlist_filtered.columns
+    ]
+
+    wishlist_items_display = (
+        wishlist_filtered
+        .sort_values("Total", ascending=False)
+        .loc[:, wishlist_item_columns]
+    )
+
     st.dataframe(
-        wishlist_filtered.sort_values("Cost", ascending=False),
+        wishlist_items_display,
         use_container_width=True,
         hide_index=True
     )

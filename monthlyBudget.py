@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import datetime
+from yearlyBudget import filter_monthly_categories
 
 
 def show_monthly_person(name, accounts, incoming, transactions, budget_df = None):
@@ -20,20 +21,34 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     if not matching_budget.empty:
         monthly_budget = matching_budget.iloc[0]
     transactions = transactions.copy()
+    
+    # Filter out yearly categories from monthly budget
+    transactions = filter_monthly_categories(transactions)
+    
     transactions["Date"] = pd.to_datetime(transactions["Date"], errors="coerce")
     transactions["Total"] = pd.to_numeric(transactions["Total"], errors="coerce")
 
     transactions["Month"] = transactions["Date"].dt.to_period("M").astype(str)
-    month_options = ["All"] + sorted(transactions["Month"].dropna().unique().tolist())
+    current_month = pd.Timestamp.today().to_period("M").strftime("%Y-%m")
+    historical_months = [
+        month
+        for month in sorted(transactions["Month"].dropna().unique().tolist())
+        if month != current_month
+    ]
+    month_options = ["Current month", "All"] + historical_months
 
     selected_month = st.selectbox(
         "Filter by month",
         month_options,
-        key=f"{name.lower()}_month_filter"
+        key=f"{name.lower()}_current_month_filter"
     )
 
-    if selected_month != "All":
-        tx_filtered = transactions[transactions["Month"] == selected_month]
+    selected_month_value = (
+        current_month if selected_month == "Current month" else selected_month
+    )
+
+    if selected_month_value != "All":
+        tx_filtered = transactions[transactions["Month"] == selected_month_value]
     else:
         tx_filtered = transactions
 
@@ -155,8 +170,8 @@ def show_monthly_person(name, accounts, incoming, transactions, budget_df = None
     )
 
     # Create full date range for selected month
-    if selected_month != "All":
-        month_start = pd.to_datetime(f"{selected_month}-01")
+    if selected_month_value != "All":
+        month_start = pd.to_datetime(f"{selected_month_value}-01")
         month_end = month_start + pd.offsets.MonthEnd(0)
 
         full_dates = pd.date_range(
