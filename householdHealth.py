@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import datetime
+from yearlyBudget import YEARLY_CATEGORIES
 
 CATEGORY_COLORS = {
     "Loans": "#1f77b4",
@@ -28,14 +29,22 @@ def make_budget_goal_pie(budget_df, person1_name, person2_name):
     budget_df = budget_df.copy()
     budget_df.columns = budget_df.columns.str.strip()
 
-    budget_df["Budget"] = pd.to_numeric(
-        budget_df["Budget"],
-        errors="coerce"
-    )
+    # Handle both Budget Monthly and Budget column names
+    if "Budget Monthly" in budget_df.columns:
+        budget_df["Budget"] = pd.to_numeric(
+            budget_df["Budget Monthly"],
+            errors="coerce"
+        )
+    else:
+        budget_df["Budget"] = pd.to_numeric(
+            budget_df["Budget"],
+            errors="coerce"
+        )
 
-    # Remove personal/joint total rows
+    # Remove personal/joint total rows and yearly categories
     goal_category_totals = budget_df[
-        ~budget_df["Bucket"].isin(top_level_buckets)
+        ~budget_df["Bucket"].isin(top_level_buckets) &
+        ~budget_df["Bucket"].isin(YEARLY_CATEGORIES)
     ]
 
     fig_goal = px.pie(
@@ -72,13 +81,14 @@ def show_household_health(
     budget_df.columns = budget_df.columns.str.strip()
 
     def get_budget(Bucket_name, fallback):
-        match = budget_df.loc[
-            budget_df["Bucket"] == Bucket_name,
-            "Budget"
-        ]
-
+        match = budget_df[budget_df["Bucket"] == Bucket_name]
+        
         if not match.empty:
-            return pd.to_numeric(match.iloc[0], errors="coerce")
+            # Try Budget Monthly first, then Budget
+            if "Budget Monthly" in budget_df.columns:
+                return pd.to_numeric(match.iloc[0]["Budget Monthly"], errors="coerce")
+            elif "Budget" in budget_df.columns:
+                return pd.to_numeric(match.iloc[0]["Budget"], errors="coerce")
 
         return fallback
 
@@ -461,13 +471,21 @@ def show_household_health(
     budget_df.columns = budget_df.columns.str.strip()
 
     goal_category_totals = budget_df[
-        ~budget_df["Bucket"].isin(top_level_buckets)
+        ~budget_df["Bucket"].isin(top_level_buckets) &
+        ~budget_df["Bucket"].isin(YEARLY_CATEGORIES)
     ].copy()
 
-    goal_category_totals["Budget"] = pd.to_numeric(
-        goal_category_totals["Budget"],
-        errors="coerce"
-    )
+    # Handle both Budget Monthly and Budget column names
+    if "Budget Monthly" in goal_category_totals.columns:
+        goal_category_totals["Budget"] = pd.to_numeric(
+            goal_category_totals["Budget Monthly"],
+            errors="coerce"
+        )
+    else:
+        goal_category_totals["Budget"] = pd.to_numeric(
+            goal_category_totals["Budget"],
+            errors="coerce"
+        )
 
     # ---- Pie Chart ----
     col_chart1, col_chart2 = st.columns(2)

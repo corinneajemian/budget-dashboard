@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import datetime
 
 # Categories that should be tracked yearly instead of monthly
-YEARLY_CATEGORIES = ["Travel", "Insurance", "Gifts", "Loans", "Ski", "Credit Card Annual Fees", "Mortgage"]
+YEARLY_CATEGORIES = ["Mortgage", "Travel", "Ski", "Credit Card Annual Fees", "Insurance", "Taxes"]
 
 def filter_yearly_categories(transactions):
     """Filter transactions to only include yearly categories"""
@@ -255,12 +255,6 @@ def show_annual_spending_progress(transactions, budget_df, incoming=None):
         if "Year to Date Income" in incoming_clean.columns:
             ytd_income = pd.to_numeric(incoming_clean["Year to Date Income"].iloc[0], errors="coerce") or 0
     
-    # Hardcoded annual budgets for specific categories
-    hardcoded_budgets = {
-        "Travel": 8500,
-        "Loans": 17000
-    }
-    
     # Clean transactions
     transactions = transactions.copy()
     transactions["Date"] = pd.to_datetime(transactions["Date"], errors="coerce")
@@ -279,7 +273,12 @@ def show_annual_spending_progress(transactions, budget_df, incoming=None):
     budget_df = budget_df.copy()
     budget_df.columns = budget_df.columns.str.strip()
     budget_df["Bucket"] = budget_df["Bucket"].astype(str).str.strip()
-    budget_df["Budget"] = pd.to_numeric(budget_df["Budget"], errors="coerce")
+    
+    # Ensure Budget Monthly and Yearly columns exist and are numeric
+    if "Budget Monthly" in budget_df.columns:
+        budget_df["Budget Monthly"] = pd.to_numeric(budget_df["Budget Monthly"], errors="coerce")
+    if "Yearly" in budget_df.columns:
+        budget_df["Yearly"] = pd.to_numeric(budget_df["Yearly"], errors="coerce")
     
     # Group transactions by category and sum
     category_spending = (
@@ -296,17 +295,23 @@ def show_annual_spending_progress(transactions, budget_df, incoming=None):
         category = row["Category"]
         ytd_spending = row["Total"]
         
-        # Check hardcoded budgets first, then fall back to budget_df
-        if category in hardcoded_budgets:
-            annual_budget = hardcoded_budgets[category]
-        else:
-            # Get monthly budget for this category
-            budget_row = budget_df[budget_df["Bucket"] == category]
-            if not budget_row.empty:
-                monthly_budget = budget_row.iloc[0]["Budget"]
-                annual_budget = monthly_budget * 12
+        # Look for category in budget_df
+        budget_row = budget_df[budget_df["Bucket"] == category]
+        
+        if not budget_row.empty:
+            # Check if Yearly column exists and has a value
+            if "Yearly" in budget_df.columns and pd.notna(budget_row.iloc[0]["Yearly"]):
+                annual_budget = budget_row.iloc[0]["Yearly"]
             else:
-                annual_budget = ytd_spending  # If no budget, use spending as annual budget
+                # Fall back to monthly * 12 (try Budget Monthly first, then Budget)
+                monthly_budget = 0
+                if "Budget Monthly" in budget_df.columns:
+                    monthly_budget = budget_row.iloc[0]["Budget Monthly"]
+                elif "Budget" in budget_df.columns:
+                    monthly_budget = budget_row.iloc[0]["Budget"]
+                annual_budget = monthly_budget * 12 if pd.notna(monthly_budget) and monthly_budget > 0 else ytd_spending
+        else:
+            annual_budget = ytd_spending  # If no budget, use spending as annual budget
         
         # Calculate percentage
         percentage = min((ytd_spending / annual_budget * 100), 100) if annual_budget > 0 else 0
@@ -328,19 +333,19 @@ def show_annual_spending_progress(transactions, budget_df, incoming=None):
         remaining = row["Remaining"]
         
         progress_html = f"""
-        <div style='margin: 6px 0;'>
-            <div style='display: flex; align-items: flex-start; gap: 12px; margin-bottom: 2px;'>
+        <div style='margin: 10px 0;'>
+            <div style='display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px;'>
                 <div style='min-width: 90px; font-size: 13px; font-weight: bold;'>{row['Category']}</div>
                 <div style='flex: 1;'>
-                    <div style='font-size: 11px; color: #555; margin-bottom: 2px;'>
+                    <div style='font-size: 11px; color: #888; margin-bottom: 4px;'>
                         YTD: ${row['YTD Spending']:,.2f} | Budget: ${row['Annual Budget']:,.2f} | Used: {progress_percent:.1f}%
                     </div>
                 </div>
             </div>
             <div style='display: flex; align-items: center; gap: 8px;'>
                 <div style='min-width: 90px;'></div>
-                <div style='flex: 1; height: 12px; background-color: #e0e0e0; border-radius: 6px; overflow: hidden;'>
-                    <div style='height: 100%; width: {progress_percent}%; background-color: #2ecc71; border-radius: 6px; transition: width 0.3s;'></div>
+                <div style='flex: 1; height: 35px; background-color: #2a2a2a; border-radius: 4px; overflow: hidden;'>
+                    <div style='height: 100%; width: {progress_percent}%; background-color: #66cc99; border-radius: 4px; transition: width 0.3s;'></div>
                 </div>
                 <span style='font-size: 11px; min-width: 90px; text-align: right;'>{progress_percent:.1f}% • ${remaining:,.2f}</span>
             </div>

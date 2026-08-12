@@ -41,7 +41,7 @@ person2_sheet = "Spending" + person2_name
 # ---- Load Excel ----
 try:
     budget = pd.read_excel(data_source, sheet_name="MonthlyBudget")
-    accounts = pd.read_excel(data_source, sheet_name="BudgetFinances")
+    accounts = pd.read_excel(data_source, sheet_name="Accounts")
     incoming = pd.read_excel(data_source, sheet_name="Incoming")
 
     transactions1 = pd.read_excel(data_source, sheet_name=person1_sheet)
@@ -70,22 +70,22 @@ except ValueError as e:
 accounts["Total"] = pd.to_numeric(accounts["Total"], errors="coerce")
 accounts["Last Statement balance"] = pd.to_numeric(accounts["Last Statement balance"], errors="coerce")
 
-# ---- Clean incoming ----
+# ---- Clean incoming TODO might deleter this, seem unimportant ----
 incoming["Due Date"] = pd.to_datetime(incoming["Due Date"], errors="coerce")
 incoming["Total"] = pd.to_numeric(incoming["Total"], errors="coerce")
 
 tab_names = [
-    f"🥧 {person1_name}'s Monthly Budget"
+    f"{'💑' if num_people == 2 else '💰'} {person1_name}'s Monthly Budget"
 ]
 
 if num_people == 2:
-    tab_names.append(f"🥧 {person2_name}'s Monthly Budget")
+    tab_names.append(f"💑 {person2_name}'s Monthly Budget")
 
 tab_names.extend([
-    "🥧 Joint Monthly Budget",
+    f"{'💑' if num_people == 2 else '💰'} Joint Monthly Budget",
     "📅 Joint Yearly Budget",
-    "� Annual Spending Progress",
-    "�💳 Accounts",
+    "Annual Spending Progress",
+    "💳 Accounts",
     "🏡 Household Health",
     "✨ Wishlist"
 ])
@@ -159,11 +159,11 @@ with tab_joint_monthly:
         budget = budget.copy()
         budget.columns = budget.columns.str.strip()
         budget["Bucket"] = budget["Bucket"].astype(str).str.strip()
-        budget["Budget"] = pd.to_numeric(budget["Budget"], errors="coerce")
+        budget["Budget Monthly"] = pd.to_numeric(budget["Budget Monthly"], errors="coerce")
 
         matching_budget = budget.loc[
             budget["Bucket"] == "Joint",
-            "Budget"
+            "Budget Monthly"
         ]
 
         if not matching_budget.empty:
@@ -421,10 +421,18 @@ with tab_wishlist:
     budget_by_category = budget.copy()
     budget_by_category.columns = budget_by_category.columns.str.strip()
     budget_by_category["Bucket"] = budget_by_category["Bucket"].astype(str).str.strip()
-    budget_by_category["Budget"] = pd.to_numeric(
-        budget_by_category["Budget"],
-        errors="coerce"
-    ).fillna(0)
+    
+    # Handle both Budget Monthly and Budget column names
+    if "Budget Monthly" in budget_by_category.columns:
+        budget_by_category["Budget"] = pd.to_numeric(
+            budget_by_category["Budget Monthly"],
+            errors="coerce"
+        ).fillna(0)
+    else:
+        budget_by_category["Budget"] = pd.to_numeric(
+            budget_by_category["Budget"],
+            errors="coerce"
+        ).fillna(0)
 
     top_level_buckets = [person1_name, "Joint"]
 

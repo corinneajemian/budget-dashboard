@@ -7,18 +7,18 @@ from yearlyBudget import filter_monthly_categories
 def show_monthly_person(name, accounts, incoming, transactions, budget_df = None):
     st.subheader(f"🥧 {name}'s Monthly Spending by Category")
 
-    # If budget sheet was provided, override it
+    # If budget sheet was provided, look up this person's monthly budget
+    monthly_budget = 0
     if budget_df is not None:
         budget_df.columns = budget_df.columns.str.strip()
         budget_df["Bucket"] = budget_df["Bucket"].astype(str).str.strip()
-
-        matching_budget = budget_df.loc[
-            budget_df["Bucket"] == name,
-            "Budget"
-        ]
-
-    if not matching_budget.empty:
-        monthly_budget = matching_budget.iloc[0]
+        
+        # Look for this person's budget row
+        person_budget_row = budget_df[budget_df["Bucket"] == name]
+        if not person_budget_row.empty:
+            if "Budget Monthly" in budget_df.columns:
+                monthly_budget = pd.to_numeric(person_budget_row.iloc[0]["Budget Monthly"], errors="coerce")
+    
     transactions = transactions.copy()
     
     # Filter out yearly categories from monthly budget
